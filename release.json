@@ -1,0 +1,12 @@
+{
+  "version": "1.3.0",
+  "questionsPerModule": 85,
+  "modules": 12,
+  "totalQuestions": 1020,
+  "setsPerModule": 17,
+  "mp3Files": 783,
+  "audioLocales": [
+    "ms-MY",
+    "en"
+  ]
+}
