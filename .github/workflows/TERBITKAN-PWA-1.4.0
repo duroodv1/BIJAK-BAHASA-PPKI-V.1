@@ -1,0 +1,66 @@
+name: Terbitkan Bijak Bahasa PWA 1.4.0
+on:
+  push:
+    branches: [main]
+    paths:
+      - BIJAK-BAHASA-PPKI-PWA-1.4.0.zip
+      - .github/workflows/pages.yml
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Ekstrak dan sahkan pakej 10 modul
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import pathlib, zipfile, json, hashlib
+          target = pathlib.Path('site')
+          target.mkdir(exist_ok=True)
+          with zipfile.ZipFile('BIJAK-BAHASA-PPKI-PWA-1.4.0.zip') as z:
+              assert z.testzip() is None, 'ZIP rosak'
+              for member in z.infolist():
+                  if member.is_dir() or not member.filename.startswith('PWA-1.4.0/'):
+                      continue
+                  relative = pathlib.PurePosixPath(member.filename.removeprefix('PWA-1.4.0/'))
+                  assert not relative.is_absolute() and '..' not in relative.parts
+                  output = target.joinpath(*relative.parts)
+                  output.parent.mkdir(parents=True, exist_ok=True)
+                  output.write_bytes(z.read(member))
+          release = json.loads((target/'release.json').read_text())
+          assert release['version'] == '1.4.0'
+          assert release['modules'] == 10 and release['totalQuestions'] == 1350
+          counts = [n for modules in release['moduleCounts'].values() for n in modules.values()]
+          assert len(counts) == 10 and all(n == 135 for n in counts)
+          index = json.loads((target/'audio-index.json').read_text())
+          assert len(index['files']) == 783
+          for item in index['files']:
+              relative = pathlib.PurePosixPath(item['path'])
+              assert not relative.is_absolute() and '..' not in relative.parts
+              assert hashlib.sha256(target.joinpath(*relative.parts).read_bytes()).hexdigest() == item['sha256'], item['path']
+          assert (target/'index.html').is_file() and (target/'service-worker.js').is_file()
+          assert (target/'audio/v11/bm').is_dir()
+          print('LULUS: 10 modul, 1350 soalan, 783 MP3 dengan SHA-256 sepadan.')
+          PY
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: site
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Terbitkan
+        id: deployment
+        uses: actions/deploy-pages@v4
